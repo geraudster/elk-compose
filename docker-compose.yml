@@ -1,32 +1,74 @@
 version: '3'
 services:
    logstash:
-     image: docker.elastic.co/logstash/logstash:5.6.3
+     image: docker.elastic.co/logstash/logstash-oss:6.2.3
      environment:
        - PATH_CONFIG=/usr/share/logstash/pipeline/*.conf
+       - LOGSTASH_CONF=/usr/share/logstash/pipeline
+       - CONSUMER_KEY
+       - CONSUMER_SECRET
+       - OAUTH_TOKEN
+       - OAUTH_TOKEN_SECRET
      volumes:
        - $PWD/pipeline/:/usr/share/logstash/pipeline/
        - $PWD/data/:/data/
-       - $PWD/etc/logstash.yml:/usr/share/logstash/config/logstash.yml
+     links:
+       - elasticsearch
      depends_on:
        - elasticsearch
+     networks: ['stack']
 
    elasticsearch:
-     image: docker.elastic.co/elasticsearch/elasticsearch:5.6.3
+     image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.2.3
      ports:
-       - "9200:9200"
+       - 9200:9200
      volumes:
-       - $PWD/etc/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
-
+       - data-volume:/usr/share/elasticsearch/data
+     networks: ['stack']
+     environment:
+       - bootstrap.memory_lock=true
+       - discovery.type=single-node
+       - cluster.routing.allocation.disk.threshold_enabled=false
+      
    kibana:
-     image: docker.elastic.co/kibana/kibana:5.6.3
+     image: docker.elastic.co/kibana/kibana-oss:6.2.3
+     links:
+       - elasticsearch
      depends_on:
        - elasticsearch
-     environment:
-       ELASTICSEARCH_URL: http://elasticsearch:9200
      ports:
-       - "5601:5601"
-     volumes:
-       - $PWD/etc/kibana.yml:/usr/share/kibana/config/kibana.yml
+       - 5601:5601
+     networks: ['stack']
 
+#   letsencrypt:
+#     image: quay.io/letsencrypt/letsencrypt:latest
+#     command:  bash -c "sleep 6 && certbot certonly --standalone -d ${DOMAIN_NAME} --text --agree-tos --email ${CERT_EMAIL} --server https://acme-v01.api.letsencrypt.org/directory --rsa-key-size 4096 --verbose --renew-by-default --standalone-supported-challenges http-01"
+#     entrypoint: ""
+#     volumes:
+#       - letsencrypt-volume:/etc/letsencrypt
+#       - letsencrypt-volume:/var/lib/letsencrypt
+#     ports:
+#       - "80"
+#       - "443"
+#     environment:
+#       - TERM=xterm
+#
+#   nginx:
+#     image: nginx:alpine
+#     links:
+#       - letsencrypt
+#     volumes:
+#       - ./nginx-ssl.conf:/etc/nginx/conf.d/nginx-ssl.conf:ro
+#       - letsencrypt-volume:/etc/letsencrypt
+#       - letsencrypt-volume:/var/lib/letsencrypt
+#     ports:
+#       - "443:443"
+#
+volumes:
+  data-volume:
+    driver: local
+#  letsencrypt-volume:
+#    driver: local
 
+networks:
+  stack: {}

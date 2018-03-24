@@ -2,3 +2,4 @@
 *.conf
 *.csv
 sincedb
+.env
