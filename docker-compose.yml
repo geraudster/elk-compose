@@ -1,32 +1,68 @@
 version: '3'
 services:
-   logstash:
-     image: docker.elastic.co/logstash/logstash:5.6.3
-     environment:
-       - PATH_CONFIG=/usr/share/logstash/pipeline/*.conf
-     volumes:
-       - $PWD/pipeline/:/usr/share/logstash/pipeline/
-       - $PWD/data/:/data/
-       - $PWD/etc/logstash.yml:/usr/share/logstash/config/logstash.yml
-     depends_on:
-       - elasticsearch
+  logstash:
+    image: docker.elastic.co/logstash/logstash:5.6.10
+    environment:
+      - PATH_CONFIG=/usr/share/logstash/pipeline/*.conf
+    volumes:
+      - $PWD/pipeline/:/usr/share/logstash/pipeline/
+      - $PWD/data/:/data/
+      - $PWD/etc/logstash.yml:/usr/share/logstash/config/logstash.yml
+    depends_on:
+      - elasticsearch
+    labels:
+      - traefik.enable=false
 
-   elasticsearch:
-     image: docker.elastic.co/elasticsearch/elasticsearch:5.6.3
-     ports:
-       - "9200:9200"
-     volumes:
-       - $PWD/etc/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
-
-   kibana:
-     image: docker.elastic.co/kibana/kibana:5.6.3
-     depends_on:
-       - elasticsearch
-     environment:
-       ELASTICSEARCH_URL: http://elasticsearch:9200
-     ports:
-       - "5601:5601"
-     volumes:
-       - $PWD/etc/kibana.yml:/usr/share/kibana/config/kibana.yml
+      
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.10
+    ports:
+      - "9200:9200"
+    volumes:
+      - $PWD/etc/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+    labels:
+      - traefik.enable=false
 
 
+  kibana:
+    image: docker.elastic.co/kibana/kibana:5.6.10
+    depends_on:
+      - elasticsearch
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    volumes:
+      - $PWD/etc/kibana.yml:/usr/share/kibana/config/kibana.yml
+    labels:
+      - traefik.backend=kibana
+      - traefik.frontend.rule=Host:k.${ELK_DOMAIN}
+      - traefik.passHostHeader=true
+      - traefik.enable=true
+
+  r:
+    image: traefik #The official Traefik docker image
+    command: >
+      --api --docker --logLevel=DEBUG \
+      --defaultentrypoints=http,https \
+      --acme \
+      --acme.storage=/etc/traefik/acme/acme.json \
+      --acme.entryPoint=https \
+      --acme.httpChallenge.entryPoint=http \
+      --acme.email=${ACME_EMAIL} \
+      --acme.OnHostRule=true \
+      --acme.onDemand=false \
+      --docker.domain=${ELK_DOMAIN}
+      
+    ports:
+      - "80:80"     #The HTTP port
+#      - "8080:8080" #The Web UI (enabled by --api)
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock #So that Traefik can listen to the Docker events
+      - acme-storage:/etc/traefik/acme
+      - ${PWD}/.htpasswd:/etc/traefik/.htpasswd
+      - ${PWD}/traefik.toml:/etc/traefik/traefik.toml
+
+volumes:
+  acme-storage: {}
