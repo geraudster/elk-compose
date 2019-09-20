@@ -1,7 +1,7 @@
 version: '3'
 services:
    logstash:
-     image: docker.elastic.co/logstash/logstash-oss:6.2.3
+     image: docker.elastic.co/logstash/logstash:7.3.2
      environment:
        - PATH_CONFIG=/usr/share/logstash/pipeline/*.conf
        - LOGSTASH_CONF=/usr/share/logstash/pipeline
@@ -21,7 +21,7 @@ services:
        - traefik.enable=false
 
    elasticsearch:
-     image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.2.3
+     image: docker.elastic.co/elasticsearch/elasticsearch:7.3.2
      ports:
        - 9200:9200
      volumes:
@@ -35,7 +35,7 @@ services:
        - traefik.enable=false
       
    kibana:
-     image: docker.elastic.co/kibana/kibana-oss:6.2.3
+     image: docker.elastic.co/kibana/kibana:7.3.2
      links:
        - elasticsearch
      depends_on:
