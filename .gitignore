@@ -1,5 +1,4 @@
 *~
-*.conf
 *.csv
 sincedb
 .env

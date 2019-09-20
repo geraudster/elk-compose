@@ -1,44 +1,53 @@
 version: '3'
 services:
-  logstash:
-    image: docker.elastic.co/logstash/logstash:5.6.10
-    environment:
-      - PATH_CONFIG=/usr/share/logstash/pipeline/*.conf
-    volumes:
-      - $PWD/pipeline/:/usr/share/logstash/pipeline/
-      - $PWD/data/:/data/
-      - $PWD/etc/logstash.yml:/usr/share/logstash/config/logstash.yml
-    depends_on:
-      - elasticsearch
-    labels:
-      - traefik.enable=false
+   logstash:
+     image: docker.elastic.co/logstash/logstash-oss:6.2.3
+     environment:
+       - PATH_CONFIG=/usr/share/logstash/pipeline/*.conf
+       - LOGSTASH_CONF=/usr/share/logstash/pipeline
+       - CONSUMER_KEY
+       - CONSUMER_SECRET
+       - OAUTH_TOKEN
+       - OAUTH_TOKEN_SECRET
+     volumes:
+       - $PWD/pipeline/:/usr/share/logstash/pipeline/
+       - $PWD/data/:/data/
+     links:
+       - elasticsearch
+     depends_on:
+       - elasticsearch
+     networks: ['stack']
+     labels:
+       - traefik.enable=false
 
+   elasticsearch:
+     image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.2.3
+     ports:
+       - 9200:9200
+     volumes:
+       - data-volume:/usr/share/elasticsearch/data
+     networks: ['stack']
+     environment:
+       - bootstrap.memory_lock=true
+       - discovery.type=single-node
+       - cluster.routing.allocation.disk.threshold_enabled=false
+     labels:
+       - traefik.enable=false
       
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.10
-    ports:
-      - "9200:9200"
-    volumes:
-      - $PWD/etc/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
-    labels:
-      - traefik.enable=false
-
-
-  kibana:
-    image: docker.elastic.co/kibana/kibana:5.6.10
-    depends_on:
-      - elasticsearch
-    environment:
-      ELASTICSEARCH_URL: http://elasticsearch:9200
-    ports:
-      - "5601:5601"
-    volumes:
-      - $PWD/etc/kibana.yml:/usr/share/kibana/config/kibana.yml
-    labels:
-      - traefik.backend=kibana
-      - traefik.frontend.rule=Host:k.${ELK_DOMAIN}
-      - traefik.passHostHeader=true
-      - traefik.enable=true
+   kibana:
+     image: docker.elastic.co/kibana/kibana-oss:6.2.3
+     links:
+       - elasticsearch
+     depends_on:
+       - elasticsearch
+     ports:
+       - 5601:5601
+     networks: ['stack']
+     labels:
+       - traefik.backend=kibana
+       - traefik.frontend.rule=Host:k.${ELK_DOMAIN}
+       - traefik.passHostHeader=true
+       - traefik.enable=true
 
   r:
     image: traefik #The official Traefik docker image
@@ -65,4 +74,9 @@ services:
       - ${PWD}/traefik.toml:/etc/traefik/traefik.toml
 
 volumes:
+  data-volume:
+    driver: local
   acme-storage: {}
+
+networks:
+  stack: {}
